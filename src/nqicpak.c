@@ -271,11 +271,14 @@ static inline uint32_t nqi_idx_base(unsigned s) { return (2u << s) - 2u; }
 
 #define NQI_IDX_MAX 508
 
-/* Offset idx uses 5bit+rem integer encoding */
+/*
+Offset idx uses 4bit+rem integer encoding 
+For 15+ bits, we add some more bits to save costs a bit... If < 15 bits, then no need
+*/
 
 static int nqi_idx_split4(uint32_t index, unsigned* shift, uint32_t* extra)
 {
-    if (index >= 0x1ffff)
+    if (index > 0x5FFFF)
         return -1;
 
     unsigned s = (31u - (unsigned)__builtin_clz(index + 2u)) - 1u;
@@ -290,7 +293,15 @@ static int _nqicpak_pack_int4(unsigned char* cmd, unsigned int* cmd_size, int n)
     unsigned s; uint32_t e;
     unsigned int index_unsigned = ((n < 0) ? (n * (-1)) : n);
     if (nqi_idx_split4(index_unsigned, &s, &e)) return -1;
-    _nqicpak_write_bits(cmd, cmd_size, s, 4);
+    if (s < 15)
+        _nqicpak_write_bits(cmd, cmd_size, s, 4);
+    else
+    {
+        _nqicpak_write_bits(cmd, cmd_size, 0xf, 4);
+        _nqicpak_write_bit(cmd, cmd_size, (s>15)?1:0);
+        if (s>15)
+            _nqicpak_write_bit(cmd, cmd_size, (s>16)?1:0);
+    }
     _nqicpak_write_bits(cmd, cmd_size, e, s + 1);
     _nqicpak_write_bit(cmd, cmd_size, ((n < 0) ? 1 : 0)); //write sign of no
     return 0;
@@ -346,7 +357,7 @@ void _nqicpak_pack_block_4x4_rleoff(nqicpak_block* block, unsigned char* cmd, un
             if (curr_off >= 0 && curr_off <= (0xffffff * 3))
             {
                 unsigned int diff2_ns = (diff2 < 0) ? (diff2 * -1) : diff2;
-                if (diff2_ns < 0x1ffff)
+                if (diff2_ns <= 0x5FFFF)
                     mode = true;
             }
             if (mode == true)
@@ -400,7 +411,6 @@ void _nqicpak_pack_block_4x4_prevdiff_rleoff(nqicpak_block* block, nqicpak_block
         _nqicpak_pack_integ(cmd, cmd_size, run);
         {
             int pos_in_tbl = 0;
-            int valid;
             unsigned int s = 0, a = 0;
             bool equal = (diffs[curr_pel].r == 0 && diffs[curr_pel].g == 0 && diffs[curr_pel].b == 0);
             _nqicpak_write_bit(cmd, cmd_size, equal);
@@ -423,7 +433,7 @@ void _nqicpak_pack_block_4x4_prevdiff_rleoff(nqicpak_block* block, nqicpak_block
                     if (curr_off >= 0 && curr_off <= (0xffffff * 3))
                     {
                         unsigned int diff2_ns = (diff2 < 0) ? (diff2 * -1) : diff2;
-                        if (diff2_ns <= 0x1ffff)
+                        if (diff2_ns <= 0x5FFFF)
                             found_in_pel = true;
                     }
                     if (found_in_pel == true)
@@ -527,13 +537,13 @@ void nqicpak_context_init(nqicpak_context* nqic, const unsigned char* src, nqic_
         goto clean_me;
     memset(temp_ctxt->cmd, 0, size*2);
     temp_ctxt->cmd_size = 0;
-    temp_ctxt->pels = (unsigned char*)malloc(temp_ctxt->blocks_cnt * 768);
+    temp_ctxt->pels = (unsigned char*)malloc(temp_ctxt->blocks_cnt * 48);
     if (temp_ctxt->pels == NULL)
         goto clean_me;
-    memset(temp_ctxt->pels, 0, temp_ctxt->blocks_cnt * 768);
+    memset(temp_ctxt->pels, 0, temp_ctxt->blocks_cnt * 48);
     temp_ctxt->pels_size = 0;
 
-    nqi_pelhash_init(&temp_ctxt->ph, temp_ctxt->blocks_cnt * 256);
+    nqi_pelhash_init(&temp_ctxt->ph, temp_ctxt->blocks_cnt * 16);
     nqi_dtmap_init(&temp_ctxt->dt, nqic_diff_tbl, NQI_IDX_MAX + 1);
 
     ret = true;
@@ -581,7 +591,7 @@ bool nqicpak_encode(nqicpak_context nqic)
 
     temp_ctxt = (nqicpak_context_internal*)nqic;
 
-    memset(temp_ctxt->pels, 0, temp_ctxt->src_size);
+    memset(temp_ctxt->pels, 0, temp_ctxt->blocks_cnt*48);
     temp_ctxt->pels_size = 0;
 
     nqi_pelhash_reset(&temp_ctxt->ph);
@@ -590,7 +600,7 @@ bool nqicpak_encode(nqicpak_context nqic)
     {
         bool row_duplicate = false;
         unsigned int align_row_blocks = (temp_ctxt->src_dim->width / 4) + (temp_ctxt->src_dim->width % 4 ? 1 : 0);
-        unsigned char costs[4][4096];
+        unsigned char costs[4][64];
         unsigned char costs_pels[4][48];
         unsigned int costs_sizes[4];
         unsigned int costs_pels_sizes[4];
@@ -684,7 +694,7 @@ bool nqicpak_encode(nqicpak_context nqic)
                 //Just RLE'd block
                 int prev_curr_diff = temp_ctxt->curr_diff;
                 _nqicpak_write_bit(temp_ctxt->cmd, &temp_ctxt->cmd_size, 0);
-                _nqicpak_write_bit(costs[1], &costs_sizes[1], 0);
+                _nqicpak_write_bit(costs[0], &costs_sizes[0], 0);
                 _nqicpak_write_bit(costs[0], &costs_sizes[0], 0);
                 _nqicpak_pack_block_4x4_rleoff(temp_ctxt->blocks[curr_block], costs[0], &costs_sizes[0], temp_ctxt->pels, &temp_ctxt->pels_size, &temp_ctxt->ph, pels_prev_size, &temp_ctxt->curr_diff);
                 costs_pels_sizes[0] = temp_ctxt->pels_size - pels_prev_size;
@@ -723,7 +733,7 @@ bool nqicpak_encode(nqicpak_context nqic)
                     while (what_offset < 3)
                     {
                         //RLE'd+diff'd block at non-prev block (i.e. block at curr x - 1 or curr y - 1 ...)
-                        unsigned char candidate_cost[4096];
+                        unsigned char candidate_cost[64];
                         unsigned int candidate_size = 0;
                         unsigned char candidate_pels[48];
                         unsigned int candidate_pels_size = 0;
@@ -765,12 +775,10 @@ bool nqicpak_encode(nqicpak_context nqic)
                     //for type 3 we check if previous block STRICTLY is the same as previous col for all other cols...
                     //4096 is used as a skip flag
                     {
-                        unsigned char candidate_cost[4096];
+                        unsigned char candidate_cost[64];
                         unsigned int candidate_size = 0;
-                        unsigned char candidate_pels[4096];
+                        unsigned char candidate_pels[48];
                         unsigned int candidate_pels_size = 0;
-                        unsigned char candidate_offs[1024];
-                        unsigned int candidate_offs_size = 0;
                         unsigned int candidate_total_size = 0;
                         int cx = curr_x - 1;
                         bool offs_bk_equals = false;
@@ -843,6 +851,7 @@ bool nqicpak_flush(nqicpak_context nqic)
     temp_ctxt = (nqicpak_context_internal*)nqic;
 
     printf("\rtotal sz: %d\n", (temp_ctxt->cmd_size + 7) / 8 + temp_ctxt->pels_size);
+
     ret = true;
 
 clean_me:
