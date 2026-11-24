@@ -821,6 +821,8 @@ bool nqicpak_encode(nqicpak_context nqic)
                     nqi_pelhash_sync(&temp_ctxt->ph, temp_ctxt->pels, temp_ctxt->pels_size);
                     temp_ctxt->curr_diff = curr_diffs[best_type];
                 }
+                else
+                    temp_ctxt->curr_diff = prev_curr_diff;
             }
             if (temp_ctxt->blocks[curr_block]->w * temp_ctxt->blocks[curr_block]->h != 4 * 4)
                 restart_like_new = true;
