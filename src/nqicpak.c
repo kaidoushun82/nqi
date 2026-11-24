@@ -685,9 +685,7 @@ bool nqicpak_encode(nqicpak_context nqic)
                 }
                 curr_block--;
                 printf("block %d->%d are equal\n", curr_block-matches+1, curr_block);
-                _nqicpak_write_bit(temp_ctxt->cmd, &temp_ctxt->cmd_size, (matches>1)?1:0);
-                if (matches > 1)
-                    _nqicpak_pack_integ(temp_ctxt->cmd, &temp_ctxt->cmd_size, matches);
+                _nqicpak_pack_integ(temp_ctxt->cmd, &temp_ctxt->cmd_size, matches);
             }
             else
             {
