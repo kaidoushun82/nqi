@@ -418,8 +418,8 @@ void _nqicpak_pack_block_4x4_prevdiff_rleoff(nqicpak_block* block, nqicpak_block
             {
                 bool write_pel = true;
                 pos_in_tbl = nqi_dtmap_find(dt, ((diffs[curr_pel].b << 16) | (diffs[curr_pel].g << 8) | (diffs[curr_pel].r)));
-                _nqicpak_write_bit(cmd, cmd_size, (pos_in_tbl <= NQI_IDX_MAX && pos_in_tbl != -1) ? 1 : 0);
-                if (pos_in_tbl <= NQI_IDX_MAX && pos_in_tbl != -1)
+                _nqicpak_write_bit(cmd, cmd_size, pos_in_tbl != -1 ? 1 : 0);
+                if (pos_in_tbl != -1)
                 {
                     _nqicpak_pack_integ(cmd, cmd_size, pos_in_tbl);
                     write_pel = false;
@@ -821,8 +821,6 @@ bool nqicpak_encode(nqicpak_context nqic)
                     nqi_pelhash_sync(&temp_ctxt->ph, temp_ctxt->pels, temp_ctxt->pels_size);
                     temp_ctxt->curr_diff = curr_diffs[best_type];
                 }
-                else
-                    temp_ctxt->curr_diff = prev_curr_diff;
             }
             if (temp_ctxt->blocks[curr_block]->w * temp_ctxt->blocks[curr_block]->h != 4 * 4)
                 restart_like_new = true;
