@@ -433,13 +433,7 @@ void _nqicpak_pack_block_4x4_prevdiff_rleoff(nqicpak_block* block, nqicpak_block
                     if (found_in_pel == true)
                     {
                         _nqicpak_write_bit(cmd, cmd_size, 0); 
-                        if (diff2 == 0)
-                            _nqicpak_write_bit(cmd, cmd_size, 0);
-                        else
-                        {
-                            _nqicpak_write_bit(cmd, cmd_size, 1);
-                            _nqicpak_pack_int4(cmd, cmd_size, diff2);
-                        }
+                        _nqicpak_pack_int4(cmd, cmd_size, diff2);
                         *curr_diff = diff;
                     }
                     else
