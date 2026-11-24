@@ -10,6 +10,12 @@ compile_commands.json
 CTestTestfile.cmake
 _deps
 CMakeUserPresets.json
+# we do not need samples shared yet
+samples
+# build out skipped
+out
+# docs not ready
+docs
 
 # CLion
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
