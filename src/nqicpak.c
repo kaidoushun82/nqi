@@ -273,7 +273,7 @@ int _nqicpak_find_rle_4x4_rgba(nqicpak_rgba* block, unsigned int curr_pel)
 
 static inline uint32_t nqi_idx_base(unsigned s) { return (2u << s) - 2u; }
 
-#define NQI_IDX_MAX 255
+#define NQI_IDX_MAX 508
 
 /* Offset idx uses 5bit+rem integer encoding */
 
