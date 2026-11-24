@@ -106,6 +106,17 @@ static void nqi_pelhash_sync(nqi_pelhash* ph, const unsigned char* pel, unsigned
     }
 }
 
+static void nqi_pelhash_rollback(nqi_pelhash* ph, const unsigned char* pel, unsigned old_committed)
+{
+    while (ph->committed > old_committed)
+    {
+        unsigned e = --ph->committed;
+        unsigned h = nqi_hash24(nqi_rgb_key(pel + e * 3),NQI_PH_BITS);
+        ph->head[h] = ph->prev[e];
+    }
+}
+
+
 static inline int nqi_pel_find(const nqi_pelhash* ph, const unsigned char* pel,
                                unsigned base, unsigned pel_size,
                                const unsigned char* rgb)
