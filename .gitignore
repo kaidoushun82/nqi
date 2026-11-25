@@ -16,6 +16,8 @@ samples
 out
 # docs not ready
 docs
+# unpolished
+src/_*
 
 # CLion
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can

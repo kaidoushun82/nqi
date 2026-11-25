@@ -12,7 +12,7 @@ static inline unsigned nqi_hash24(uint32_t v, unsigned bits)
 
 /* diff hashing */
 
-#define NQI_DT_BITS 9
+#define NQI_DT_BITS 10
 #define NQI_DT_SIZE (1u << NQI_DT_BITS)
 
 typedef struct {
