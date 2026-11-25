@@ -291,8 +291,9 @@ static int nqi_idx_split4(uint32_t index, unsigned* shift, uint32_t* extra)
 static int _nqicpak_pack_int4(unsigned char* cmd, unsigned int* cmd_size, int n)
 {
     unsigned s; uint32_t e;
-    unsigned int index_unsigned = ((n < 0) ? (n * (-1)) : n);
-    if (nqi_idx_split4(index_unsigned, &s, &e)) return -1;
+    unsigned int index_unsigned = abs(n);
+    if (nqi_idx_split4(index_unsigned, &s, &e))
+        return -1;
     if (s < 15)
         _nqicpak_write_bits(cmd, cmd_size, s, 4);
     else
@@ -338,29 +339,23 @@ static void _nqicpak_pack_integ(unsigned char* cmd, unsigned int* cmd_size, unsi
 void _nqicpak_pack_block_4x4_rleoff(nqicpak_block* block, unsigned char* cmd, unsigned int* cmd_size, unsigned char* pel, unsigned int* pel_size, nqi_pelhash* ph, unsigned int base, int *curr_diff)
 {
     unsigned int curr_pel = 0;
-
-    int curr_x = 0;
-    int curr_y = 0;
+    unsigned int run;
 
     while (curr_pel < 4 * 4)
     {
-        int pos;
-        unsigned int run;
-        bool write_pel = true;
         run = _nqicpak_find_rle_4x4(block, curr_pel);
         _nqicpak_pack_integ(cmd, cmd_size, run);
         {
             int curr_off = nqi_pel_find(ph, pel, base, *pel_size, &block->pels[curr_pel]);
             int diff = ((*pel_size) - curr_off) / 3;
             int diff2 = diff - *curr_diff;
-            bool mode = false;
+            bool valid_to_exist_in_prev = false;
             if (curr_off >= 0 && curr_off <= (0xffffff * 3))
             {
-                unsigned int diff2_ns = (diff2 < 0) ? (diff2 * -1) : diff2;
-                if (diff2_ns <= 0x5FFFF)
-                    mode = true;
+                if (abs(diff2) <= 0x5FFFF)
+                    valid_to_exist_in_prev = true;
             }
-            if (mode == true)
+            if (valid_to_exist_in_prev == true)
             {
                 _nqicpak_write_bit(cmd, cmd_size, 0);
                 _nqicpak_pack_int4(cmd, cmd_size, diff2);
@@ -382,10 +377,9 @@ void _nqicpak_pack_block_4x4_rleoff(nqicpak_block* block, unsigned char* cmd, un
 void _nqicpak_pack_block_4x4_prevdiff_rleoff(nqicpak_block* block, nqicpak_block* block_previous, unsigned char* cmd, unsigned int* cmd_size, unsigned char* pel, unsigned int* pel_size, nqi_pelhash* ph, nqi_dtmap* dt, unsigned int base, int *curr_diff)
 {
     unsigned int curr_pel = 0;
-    nqicpak_rgba diffs[256];
-    
-    int curr_x = 0;
-    int curr_y = 0;
+    nqicpak_rgba diffs[16];
+    unsigned int run;
+    int pos_in_tbl;
 
     while (curr_pel < 4 * 4)
     {
@@ -399,13 +393,9 @@ void _nqicpak_pack_block_4x4_prevdiff_rleoff(nqicpak_block* block, nqicpak_block
 
     while (curr_pel < 4 * 4)
     {
-        int pos;
-        unsigned int run;
         run = _nqicpak_find_rle_4x4_rgba(diffs, curr_pel);
         _nqicpak_pack_integ(cmd, cmd_size, run);
         {
-            int pos_in_tbl = 0;
-            unsigned int s = 0, a = 0;
             bool equal = (diffs[curr_pel].r == 0 && diffs[curr_pel].g == 0 && diffs[curr_pel].b == 0);
             _nqicpak_write_bit(cmd, cmd_size, equal);
             if (equal == false)
@@ -423,16 +413,15 @@ void _nqicpak_pack_block_4x4_prevdiff_rleoff(nqicpak_block* block, nqicpak_block
                     int curr_off = nqi_pel_find(ph, pel, base, *pel_size, &block->pels[curr_pel]);
                     int diff = ((*pel_size) - curr_off) / 3;
                     int diff2 = diff - *curr_diff;
-                    bool found_in_pel = false;
+                    bool valid_to_exist_in_prev = false;
                     if (curr_off >= 0 && curr_off <= (0xffffff * 3))
                     {
-                        unsigned int diff2_ns = (diff2 < 0) ? (diff2 * -1) : diff2;
-                        if (diff2_ns <= 0x5FFFF)
-                            found_in_pel = true;
+                        if (abs(diff2) <= 0x5FFFF)
+                            valid_to_exist_in_prev = true;
                     }
-                    if (found_in_pel == true)
+                    if (valid_to_exist_in_prev == true)
                     {
-                        _nqicpak_write_bit(cmd, cmd_size, 0); 
+                        _nqicpak_write_bit(cmd, cmd_size, 0);
                         _nqicpak_pack_int4(cmd, cmd_size, diff2);
                         *curr_diff = diff;
                     }
@@ -542,7 +531,7 @@ clean_me:
     {
         if (temp_ctxt != NULL)
         {
-            if (temp_ctxt->blocks)
+            if (temp_ctxt->blocks != NULL)
             {
                 unsigned int curr_block = 0;
                 while (curr_block < temp_ctxt->blocks_cnt)
@@ -584,10 +573,12 @@ bool nqicpak_encode(nqicpak_context nqic)
 
     nqi_pelhash_reset(&temp_ctxt->ph);
 
+    printf("\n");
+
     while (curr_block < temp_ctxt->blocks_cnt)
     {
         bool row_duplicate = false;
-        unsigned int align_row_blocks = (temp_ctxt->src_dim->width / 4) + (temp_ctxt->src_dim->width % 4 ? 1 : 0);
+        unsigned int align_row_blocks = ((temp_ctxt->src_dim->width+3) / 4);
         unsigned char costs[4][64];
         unsigned char costs_pels[4][48];
         unsigned int costs_sizes[4];
@@ -648,7 +639,7 @@ bool nqicpak_encode(nqicpak_context nqic)
             costs_totals_sizes[0] = 0;
             costs_totals_sizes[1] = 0;
             costs_totals_sizes[2] = 0;
-            costs_totals_sizes[3] = 2; //this will change to 4096 is type3 candidate is impossible
+            costs_totals_sizes[3] = 2; //this will change to 4096 if type3 candidate is impossible
             curr_diffs[0] = 0;
             curr_diffs[1] = 0;
             curr_diffs[2] = 0;
@@ -672,7 +663,6 @@ bool nqicpak_encode(nqicpak_context nqic)
                         break;
                 }
                 curr_block--;
-                printf("block %d->%d are equal\n", curr_block-matches+1, curr_block);
                 _nqicpak_pack_integ(temp_ctxt->cmd, &temp_ctxt->cmd_size, matches);
             }
             else
@@ -794,7 +784,7 @@ bool nqicpak_encode(nqicpak_context nqic)
                             best_type = i;
                         }
                     }
-                    printf("\rblock %d: %06d %06d %06d %06d best->%d\n", curr_block, costs_totals_sizes[0], costs_totals_sizes[1], costs_totals_sizes[2], costs_totals_sizes[3], best_type);
+                    printf("\rblock %d: %06d %06d %06d %06d best->%d", curr_block, costs_totals_sizes[0], costs_totals_sizes[1], costs_totals_sizes[2], costs_totals_sizes[3], best_type);
                     for (i = 0; i < costs_sizes[best_type] / 8; i++)
                         _nqicpak_write_bits(temp_ctxt->cmd, &temp_ctxt->cmd_size, costs[best_type][i], 8);
                     for (i = 0; i < (costs_sizes[best_type] % 8); i++)
@@ -836,7 +826,7 @@ bool nqicpak_flush(nqicpak_context nqic)
 
     temp_ctxt = (nqicpak_context_internal*)nqic;
 
-    printf("\rtotal sz: %d\n", (temp_ctxt->cmd_size + 7) / 8 + temp_ctxt->pels_size);
+    printf("\ntotal sz: %d\n", (temp_ctxt->cmd_size + 7) / 8 + temp_ctxt->pels_size);
 
     ret = true;
 
