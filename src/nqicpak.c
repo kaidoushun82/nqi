@@ -6,8 +6,6 @@
 #include "nqicpak.h"
 #include "nqichash.h"
 
-/* src: https://stackoverflow.com/a/20468180 */
-
 #ifdef NQI_STATS
 typedef struct { unsigned char k; int v; int v2; int v3; } nqi_tok;
 typedef struct { nqi_tok t[200]; unsigned n; } nqi_cand;
@@ -30,6 +28,7 @@ static void g_commit(const nqi_cand* c, int type, unsigned cbits)
 #define NQI_PACK(p) 0
 #endif
 
+/* src: https://stackoverflow.com/a/20468180 */
 
 #ifdef _MSC_VER
 #include <intrin.h>
