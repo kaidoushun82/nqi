@@ -23,6 +23,126 @@ typedef struct {
 
 } nqic_context_internal;
 
+
+unsigned int _nqic_pack_intvlq(unsigned int value, unsigned char* out)
+{
+    unsigned int count = 0;
+    unsigned int value_curr = value;
+
+    while (value_curr > 0x7f)
+    {
+        out[count++] = 0x80 | (value_curr & 0x7f);
+        value_curr >>= 7;
+    }
+
+    out[count++] = value_curr;
+
+    return count;
+}
+
+
+unsigned int _nqic_pack_intbytes(unsigned int value)
+{
+    unsigned int count = 0;
+    unsigned int value_curr = value;
+
+    while (value_curr > 0x7f)
+        count++, value_curr >>= 7;
+
+    count++;
+
+    return count;
+}
+
+bool _nqic_meta_new(nqic_context* nqic, unsigned int buffer_size)
+{
+    nqic_context_internal* temp_ctxt;
+    bool ret = false;
+    unsigned int nc;
+
+    if (nqic == NULL)
+    {
+        goto clean_me;
+    }
+
+    temp_ctxt = (nqic_context_internal*)nqic;
+
+    nc = temp_ctxt->metas_count + 1;
+
+    if (temp_ctxt->metas == NULL)
+        temp_ctxt->metas = (nqim_metadata**)malloc(sizeof(nqim_metadata*));
+    else
+        temp_ctxt->metas = (nqim_metadata**)realloc(temp_ctxt->metas, nc*sizeof(nqim_metadata*));
+
+    if (temp_ctxt->metas == NULL)
+    {
+        goto clean_me;
+    }
+
+    temp_ctxt->metas[temp_ctxt->metas_count] = (nqim_metadata*)malloc(sizeof(nqim_metadata)+buffer_size);
+
+    if (temp_ctxt->metas[temp_ctxt->metas_count] == NULL)
+    {
+        goto clean_me;
+    }
+
+    printf("for meta %d alloced %d bytes\n", nc, sizeof(nqim_metadata) + buffer_size);
+
+    memset(temp_ctxt->metas[temp_ctxt->metas_count], 0, sizeof(nqim_metadata) + buffer_size);
+
+    temp_ctxt->metas_count++;
+
+    ret = true;
+
+clean_me:
+
+    return ret;
+}
+
+unsigned int _nqic_meta_total_size(nqic_context* nqic)
+{
+    nqic_context_internal* temp_ctxt;
+    unsigned int nc;
+    unsigned int sz = 0;
+
+    if (nqic == NULL)
+    {
+        return 0;
+    }
+
+    temp_ctxt = (nqic_context_internal*)nqic;
+
+    for (nc = 0; nc < temp_ctxt->metas_count; nc++)
+    {
+        unsigned int ms = 1 + _nqic_pack_intbytes(temp_ctxt->metas[nc]->size) + temp_ctxt->metas[nc]->size;
+        sz += ((ms+3)/4)*4;
+        sz += 4;
+    }
+
+    return sz;
+}
+
+void _nqic_meta_free(nqic_context* nqic)
+{
+    nqic_context_internal* temp_ctxt;
+    unsigned int nc;
+
+    if (nqic == NULL)
+    {
+        return;
+    }
+
+    temp_ctxt = (nqic_context_internal*)nqic;
+
+    for (nc = 0; nc < temp_ctxt->metas_count; nc++)
+    {
+        if (temp_ctxt->metas[nc] != NULL)
+            free(temp_ctxt->metas[nc]);
+    }
+    free(temp_ctxt->metas);
+    temp_ctxt->metas_count = 0;
+}
+
 void nqic_init(nqic_context *nqic)
 {
     nqic_context_internal *temp_ctxt;
@@ -134,6 +254,9 @@ bool nqic_encode(nqic_context nqic)
 {
     nqic_context_internal *temp_ctxt;
     unsigned int current_image = 0;
+    unsigned int midx = 1;
+    unsigned char* op;
+    unsigned int os;
     bool ret = false;
 
     if (nqic == NULL)
@@ -152,20 +275,70 @@ bool nqic_encode(nqic_context nqic)
     {
         nqicpak_context nqicpak;
 
+        //for first image, create first metadata, w and h and cnts
+        if (current_image == 0)
+        {
+            if (_nqic_meta_new(nqic, 32) == false)
+                goto clean_me;
+            temp_ctxt->metas[0]->type = NQIM_META_WHOLE_IMAGE; //whole image meta
+            temp_ctxt->metas[0]->data[temp_ctxt->metas[0]->size++] = temp_ctxt->cnt &0xff;
+            temp_ctxt->metas[0]->data[temp_ctxt->metas[0]->size++] = temp_ctxt->cnt >>8;
+            temp_ctxt->metas[0]->size += _nqic_pack_intvlq(temp_ctxt->src_dims[0]->width, &temp_ctxt->metas[0]->data[temp_ctxt->metas[0]->size]);
+            temp_ctxt->metas[0]->size += _nqic_pack_intvlq(temp_ctxt->src_dims[0]->height, &temp_ctxt->metas[0]->data[temp_ctxt->metas[0]->size]);
+        }
+
         nqicpak_context_init(&nqicpak, temp_ctxt->src_buffers[current_image], temp_ctxt->src_dims[current_image], temp_ctxt->src_sizes[current_image]);
         nqicpak_encode(nqicpak);
         nqicpak_flush(nqicpak);
 
+        {
+            unsigned short atts = 0;
+            if (nqicpak_get_output(nqicpak, &op, &os) == false)
+                goto clean_me;
+            if (_nqic_meta_new(nqic, os*2) == false)
+                goto clean_me;
+            temp_ctxt->metas[midx]->type = NQIM_META_IMAGE_DATA; //image data meta
+            temp_ctxt->metas[midx]->data[temp_ctxt->metas[midx]->size++] = current_image & 0xff;
+            temp_ctxt->metas[midx]->data[temp_ctxt->metas[midx]->size++] = current_image >> 8;
+            temp_ctxt->metas[midx]->size += _nqic_pack_intvlq(temp_ctxt->src_dims[current_image]->width, &temp_ctxt->metas[midx]->data[temp_ctxt->metas[midx]->size]);
+            temp_ctxt->metas[midx]->size += _nqic_pack_intvlq(temp_ctxt->src_dims[current_image]->height, &temp_ctxt->metas[midx]->data[temp_ctxt->metas[midx]->size]);
+            //need work, until then... no offs saving...
+            temp_ctxt->metas[midx]->size += _nqic_pack_intvlq(0, &temp_ctxt->metas[midx]->data[temp_ctxt->metas[midx]->size]);
+            temp_ctxt->metas[midx]->size += _nqic_pack_intvlq(0, &temp_ctxt->metas[midx]->data[temp_ctxt->metas[midx]->size]);
+            atts = 0; //17 bits for offs
+            temp_ctxt->metas[midx]->data[temp_ctxt->metas[midx]->size++] = atts & 0xff;
+            temp_ctxt->metas[midx]->data[temp_ctxt->metas[midx]->size++] = atts >> 8;
+            memcpy(&temp_ctxt->metas[midx]->data[temp_ctxt->metas[midx]->size], op, os);
+            temp_ctxt->metas[midx]->size += os;
+
+            midx++;
+        }
+
+        nqicpak_free(&nqicpak);
+        op = NULL;
         current_image++;
     }
 
+    //last meta to flag the end!
+    if (_nqic_meta_new(nqic, 32) == false)
+        goto clean_me;
+
+    temp_ctxt->metas[midx]->type = NQIM_META_NONE; //image data meta
+
+    ret = true;
+
 clean_me:
+    if (ret == false)
+        _nqic_meta_free(nqic);
     return ret;
 }
 
 bool nqic_flush(nqic_context nqic)
 {
     nqic_context_internal *temp_ctxt;
+    unsigned int meta_total_sz = 0;
+    unsigned int current_meta_sz = 0;
+    unsigned int nc;
     bool ret = false;
 
     if (nqic == NULL)
@@ -175,13 +348,52 @@ bool nqic_flush(nqic_context nqic)
 
     temp_ctxt = (nqic_context_internal*)nqic;
 
-    //do flushing a bit later :)
+    meta_total_sz = _nqic_meta_total_size(nqic);
+
+    if (meta_total_sz == 0)
+    {
+        goto clean_me;
+    }
+
+    temp_ctxt->out_buffer = (unsigned char*)malloc(8 + meta_total_sz);
+    if (temp_ctxt->out_buffer == NULL)
+    {
+        goto clean_me;
+    }
+
+    temp_ctxt->out_size = 8 + meta_total_sz;
+
+    memset(temp_ctxt->out_buffer, 0, temp_ctxt->out_size);
+
+    temp_ctxt->out_buffer[0] = 'N';
+    temp_ctxt->out_buffer[1] = 'Q';
+    temp_ctxt->out_buffer[2] = 'I';
+    temp_ctxt->out_buffer[3] = (temp_ctxt->cnt > 1) ? 'A' : 'M';
+
+    //1.0 currently, changing later :)
+    temp_ctxt->out_buffer[4] = 1;
+    temp_ctxt->out_buffer[5] = 0;
+    temp_ctxt->out_buffer[6] = 0;
+    temp_ctxt->out_buffer[7] = 0;
+
+    for (nc = 0; nc < temp_ctxt->metas_count; nc++)
+    {
+        temp_ctxt->out_buffer[8+(current_meta_sz++)] = temp_ctxt->metas[nc]->type;
+        current_meta_sz += _nqic_pack_intvlq(temp_ctxt->metas[nc]->size, &temp_ctxt->out_buffer[8 + current_meta_sz]);
+        memcpy(&temp_ctxt->out_buffer[8 + current_meta_sz], temp_ctxt->metas[nc]->data, temp_ctxt->metas[nc]->size);
+        current_meta_sz += temp_ctxt->metas[nc]->size;
+        current_meta_sz = ((current_meta_sz + 3) / 4) * 4;
+    }
+
+    ret = true;
+
+    temp_ctxt->flushed = true;
 clean_me:
     return ret;
 
 }
 
-bool nqic_get_output(nqic_context nqic, unsigned char** data, size_t* size)
+bool nqic_get_output(nqic_context nqic, unsigned char** data, unsigned int* size)
 {
     nqic_context_internal *temp_ctxt;
     if (nqic == NULL)
@@ -207,4 +419,5 @@ bool nqic_get_output(nqic_context nqic, unsigned char** data, size_t* size)
 }
 
 void nqic_free(nqic_context *nqic)
-{ }
+{
+}

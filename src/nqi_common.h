@@ -13,7 +13,7 @@ typedef enum {
 typedef struct {
     unsigned int size;
     nqim_meta_type type;
-    unsigned char data[];
+    unsigned char data[1];
 } nqim_metadata;
 
 #endif /* _NQI_COMMON_H_ */

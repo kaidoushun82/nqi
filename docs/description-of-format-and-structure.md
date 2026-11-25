@@ -47,5 +47,4 @@ In its' basic form, there are two meta chunks: a whole image information meta an
 | Alpha image          | 1 bit             | Image contains a compressed alpha channel |
 | Image type           | 1 bit             | 0 - RGB888, 1 - RGB565 |
 | Key image            | 1 bit             | Image is an animation/key frame |
-| Common offs multip.  | 7 bits            | 1 if not used, else use this multiplier to save on X/Y offset bits for the block decompression |
-| Reserved             | 6 bits            | No use under current spec, must be zeroes |
+| Reserved             | 13 bits           | For use with newer versions |

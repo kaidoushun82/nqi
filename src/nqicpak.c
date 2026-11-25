@@ -128,13 +128,9 @@ typedef struct {
 } nqicpak_rgba;
 
 typedef struct {
-    nqicpak_rgba pels[256];
+    nqicpak_rgba pels[16];
     unsigned int w;
     unsigned int h;
-    unsigned char cmd[4096];
-    unsigned int cmd_size;
-    unsigned char pelsw[768];
-    unsigned int pelsw_size;
 } nqicpak_block;
 
 typedef struct {
@@ -161,6 +157,12 @@ typedef struct {
 
     //diff
     int curr_diff;
+
+    //Output
+    unsigned char* out_buffer;
+    unsigned int out_size;
+
+    bool flushed;
 } nqicpak_context_internal;
 
 void _nqicpak_write_bits(unsigned char* encoded_bytes, unsigned int* encoded_bytes_len, unsigned int bits, int num_bits)
@@ -313,16 +315,25 @@ static int _nqicpak_pack_int4(unsigned char* cmd, unsigned int* cmd_size, int n)
     unsigned int index_unsigned = abs(n);
     if (nqi_idx_split4(index_unsigned, &s, &e))
         return -1;
-    if (s < 15)
-        _nqicpak_write_bits(cmd, cmd_size, s, 4);
+    if (s < 8)
+    {
+        _nqicpak_write_bit(cmd, cmd_size, 0);
+        _nqicpak_write_bits(cmd, cmd_size, index_unsigned, 8);
+    }
     else
     {
-        _nqicpak_write_bits(cmd, cmd_size, 0xf, 4);
-        _nqicpak_write_bit(cmd, cmd_size, (s>15)?1:0);
-        if (s>15)
-            _nqicpak_write_bit(cmd, cmd_size, (s>16)?1:0);
+        _nqicpak_write_bit(cmd, cmd_size, 1);
+        if (s < 15)
+            _nqicpak_write_bits(cmd, cmd_size, s-8, 3);
+        else
+        {
+            _nqicpak_write_bits(cmd, cmd_size, 0x7, 3);
+            _nqicpak_write_bit(cmd, cmd_size, (s > 15) ? 1 : 0);
+            if (s > 15)
+                _nqicpak_write_bit(cmd, cmd_size, (s > 16) ? 1 : 0);
+        }
+        _nqicpak_write_bits(cmd, cmd_size, e, s + 1);
     }
-    _nqicpak_write_bits(cmd, cmd_size, e, s + 1);
     _nqicpak_write_bit(cmd, cmd_size, ((n < 0) ? 1 : 0)); //write sign of no
     return 0;
 }
@@ -860,6 +871,11 @@ bool nqicpak_flush(nqicpak_context nqic)
 {
     nqicpak_context_internal* temp_ctxt;
     unsigned int curr_block = 0;
+    unsigned int cmd_size;
+    unsigned int cmd_size_a;
+    unsigned int pel_size;
+    unsigned int pel_size_a;
+    unsigned int pel_count;
     bool ret = false;
 
     if (nqic == NULL)
@@ -869,13 +885,114 @@ bool nqicpak_flush(nqicpak_context nqic)
 
     temp_ctxt = (nqicpak_context_internal*)nqic;
 
+    if (temp_ctxt->cmd_size == 0 || temp_ctxt->pels_size == 0)
+    {
+        goto clean_me;
+    }
+
+    cmd_size = (temp_ctxt->cmd_size + 7) / 8;
+    cmd_size_a = ((cmd_size + 3) / 4) * 4; //align to 4bytes
+
+    pel_size = temp_ctxt->pels_size;
+    pel_size_a = ((pel_size + 3) / 4) * 4; //ditto
+
     printf("\ntotal sz: %d\n", (temp_ctxt->cmd_size + 7) / 8 + temp_ctxt->pels_size);
+
 #ifdef NQI_STATS
     nqi_analyze(stdout, temp_ctxt->cmd_size);
 #endif
 
+    temp_ctxt->out_buffer = (unsigned char*)malloc(8 + cmd_size_a + pel_size_a);
+    if (temp_ctxt->out_buffer == NULL)
+    {
+        goto clean_me;
+    }
+
+    temp_ctxt->out_size = 8 + cmd_size_a + pel_size_a;
+
+    memset(temp_ctxt->out_buffer, 0, temp_ctxt->out_size);
+
+    temp_ctxt->out_buffer[0] = cmd_size_a & 0xff;
+    temp_ctxt->out_buffer[1] = (cmd_size_a >> 8) & 0xff;
+    temp_ctxt->out_buffer[2] = (cmd_size_a >> 16) & 0xff;
+    temp_ctxt->out_buffer[3] = (cmd_size_a >> 24) & 0xff;
+
+    memcpy(&temp_ctxt->out_buffer[4], temp_ctxt->cmd, (temp_ctxt->cmd_size + 7) / 8);
+
+    pel_count = pel_size / 3;
+
+    temp_ctxt->out_buffer[4+cmd_size_a] = pel_count & 0xff;
+    temp_ctxt->out_buffer[5+cmd_size_a] = (pel_count >> 8) & 0xff;
+    temp_ctxt->out_buffer[6+cmd_size_a] = (pel_count >> 16) & 0xff;
+    temp_ctxt->out_buffer[7+cmd_size_a] = (pel_count >> 24) & 0xff;
+
+    memcpy(&temp_ctxt->out_buffer[8+cmd_size_a], temp_ctxt->pels, pel_size);
+
+    free(temp_ctxt->cmd);
+    temp_ctxt->cmd = NULL;
+    temp_ctxt->cmd_size = 0;
+
+    free(temp_ctxt->pels);
+    temp_ctxt->pels = NULL;
+    temp_ctxt->pels_size = 0;
+
     ret = true;
+
+    temp_ctxt->flushed = true;
 
 clean_me:
     return ret;
+}
+
+bool nqicpak_get_output(nqicpak_context nqic, unsigned char** data, unsigned int* size)
+{
+    nqicpak_context_internal* temp_ctxt;
+    if (nqic == NULL)
+    {
+        *data = NULL;
+        *size = 0;
+        return false;
+    }
+
+    temp_ctxt = (nqicpak_context_internal*)nqic;
+
+    if (temp_ctxt->flushed == false)
+    {
+        *data = NULL;
+        *size = 0;
+        return false;
+    }
+
+    *data = temp_ctxt->out_buffer;
+    *size = temp_ctxt->out_size;
+
+    return true;
+}
+
+void nqicpak_free(nqicpak_context* nqic)
+{
+    nqicpak_context_internal* temp_ctxt;
+    if (*nqic != NULL)
+    {
+        temp_ctxt = *nqic;
+        if (temp_ctxt->blocks != NULL)
+        {
+            unsigned int curr_block = 0;
+            while (curr_block < temp_ctxt->blocks_cnt)
+            {
+                if (temp_ctxt->blocks[curr_block] != NULL)
+                    free(temp_ctxt->blocks[curr_block]);
+                curr_block++;
+            }
+            free(temp_ctxt->blocks);
+        }
+        if (temp_ctxt->cmd)
+            free(temp_ctxt->cmd);
+        if (temp_ctxt->pels)
+            free(temp_ctxt->pels);
+        if (temp_ctxt->out_buffer)
+            free(temp_ctxt->out_buffer);
+        free(temp_ctxt);
+        *nqic = NULL;
+    }
 }

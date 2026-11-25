@@ -11,6 +11,7 @@ void nqicpak_context_init(nqicpak_context *nqic, const unsigned char *src, nqic_
 
 bool nqicpak_encode(nqicpak_context nqic);
 bool nqicpak_flush(nqicpak_context nqic);
-bool nqicpak_get_output(nqicpak_context nqic, unsigned char** data, size_t* size);
+bool nqicpak_get_output(nqicpak_context nqic, unsigned char** data, unsigned int* size);
+void nqicpak_free(nqicpak_context *nqic);
 
 #endif

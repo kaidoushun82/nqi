@@ -14,7 +14,7 @@ void nqic_init(nqic_context *nqic);
 bool nqic_load_image(nqic_context nqic, const unsigned char* data, size_t size, int width, int height);
 bool nqic_encode(nqic_context nqic);
 bool nqic_flush(nqic_context nqic);
-bool nqic_get_output(nqic_context nqic, unsigned char** data, size_t* size);
+bool nqic_get_output(nqic_context nqic, unsigned char** data, unsigned int* size);
 void nqic_free(nqic_context *nqic);
 
 #endif

@@ -109,6 +109,7 @@ int main(int argc, char* argv[])
         nqic_init(&nqic);
         nqic_load_image(nqic, (const unsigned char*)image_decoded, image_decoded_size, w, h);
         nqic_encode(nqic);
+        nqic_flush(nqic);
         nqic_get_output(nqic, &output_data, &output_size);
 
         FILE* output = fopen(output_file, "wb");
@@ -126,8 +127,5 @@ int main(int argc, char* argv[])
         printf("Decompression is not implemented yet.\n");
         return 1;
     }
-
-    nqic_init(nqic);
-    nqic_free(nqic);
     return 0;
 }
