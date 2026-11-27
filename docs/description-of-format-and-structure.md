@@ -1,6 +1,6 @@
 # What does NQI aim?
 
-NQI as the full name suggests, aims to achieve a clean-room level codec with similar performance or better than other image codecs like Quram's Qmage.
+NQI as the full name suggests, aims to achieve a codec with similar performance or better than other image codecs like Quram's Qmage.
 
 # How are images in the NQI container stored?
 
