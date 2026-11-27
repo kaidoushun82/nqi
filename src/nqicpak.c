@@ -35,11 +35,11 @@ static void g_commit(const nqi_cand* c, int type, unsigned cbits)
 #ifdef _MSC_VER
 #include <intrin.h>
 
-uint32_t __inline __builtin_clz(uint32_t value)
+unsigned int NQI_INLINE __builtin_clz(unsigned int value)
 {
     unsigned int leading_zero = 0;
 
-    if (_BitScanReverse(&leading_zero, value))
+    if (_BitScanReverse((unsigned long*)&leading_zero, value))
     {
         return 31 - leading_zero;
     }
@@ -224,7 +224,7 @@ int _nqicpak_find_rle_4x4_rgba(nqicpak_rgba* block, unsigned int curr_pel)
     return p - curr_pel;
 }
 
-static inline uint32_t nqi_idx_base(unsigned s) { return (2u << s) - 2u; }
+static inline unsigned int nqi_idx_base(unsigned s) { return (2u << s) - 2u; }
 
 #define NQI_IDX_MAX 511
 
@@ -233,7 +233,7 @@ Offset idx uses 4bit+rem integer encoding
 For 15+ bits, we add some more bits to save costs a bit... If < 15 bits, then no need
 */
 
-static int nqi_idx_split4(uint32_t index, unsigned* shift, uint32_t* extra)
+static int nqi_idx_split4(unsigned int index, unsigned* shift, unsigned int* extra)
 {
     if (index > 0x5FFFE)
         return -1;
@@ -247,7 +247,7 @@ static int nqi_idx_split4(uint32_t index, unsigned* shift, uint32_t* extra)
 
 static int _nqicpak_pack_int4(unsigned char* cmd, unsigned int* cmd_size, int n)
 {
-    unsigned s; uint32_t e;
+    unsigned s; unsigned int e;
     unsigned int index_unsigned = abs(n);
     nqicpak_log("int4: i am writing %d\n", n);
     if (nqi_idx_split4(index_unsigned, &s, &e))
@@ -281,7 +281,7 @@ static int _nqicpak_pack_int4(unsigned char* cmd, unsigned int* cmd_size, int n)
 static void _nqicpak_pack_integ(unsigned char* cmd, unsigned int* cmd_size, unsigned int n) {
     int nb = 0;
     nqicpak_log("eg: i am writing %d\n", n);
-    for (uint32_t t = n; t; t >>= 1)
+    for (unsigned int t = n; t; t >>= 1)
         nb++;
     _nqicpak_write_bit(cmd, cmd_size, (n>1)?1:0);
     for (int i = nb - 2; i >= 0; i--) {

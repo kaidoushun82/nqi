@@ -1,6 +1,25 @@
 #ifndef _NQI_COMMON_H_
 #define _NQI_COMMON_H_
 
+// ========================= INLINE ===========================
+
+#ifdef _MSC_VER
+#define NQI_INLINE static __forceinline
+#else
+#define NQI_INLINE static inline __attribute__((always_inline))
+#endif
+
+// ========================= BITSWAP ==========================
+
+#define      NQI_BSWAP(tmp) \
+{\
+  register unsigned int  t; \
+  t = tmp ^ ((tmp << 16) | (tmp >> 16)); \
+  t &= ~0xff0000; \
+  tmp = (tmp << 24) | (tmp >> 8); \
+  tmp = tmp ^ (t >> 8); \
+}
+
 // ======================== METADATA ==========================
 
 typedef enum {
