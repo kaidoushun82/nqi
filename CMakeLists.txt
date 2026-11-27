@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22.0)
 project(nqi)
-add_executable(${PROJECT_NAME} src/main.c src/nqic.c src/nqicpak.c src/nqid.c src/spng/spng.c src/miniz/miniz.c)
+add_executable(${PROJECT_NAME} src/main.c src/nqic.c src/nqicpak.c src/nqid.c src/nqidpak.c src/spng/spng.c src/miniz/miniz.c)
 add_compile_definitions(SPNG_USE_MINIZ)
 include_directories(src/miniz)
