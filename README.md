@@ -13,4 +13,4 @@ This project currently has a short documentation of its aim and format structure
 | State | Progress |
 | ----- | -------- |
 | Docs  | 10%      |
-| Code  | 45%      |
+| Code  | 70%      |
