@@ -86,8 +86,6 @@ bool _nqic_meta_new(nqic_context* nqic, unsigned int buffer_size)
         goto clean_me;
     }
 
-    printf("for meta %d alloced %d bytes\n", nc, sizeof(nqim_metadata) + buffer_size);
-
     memset(temp_ctxt->metas[temp_ctxt->metas_count], 0, sizeof(nqim_metadata) + buffer_size);
 
     temp_ctxt->metas_count++;
@@ -323,7 +321,7 @@ bool nqic_encode(nqic_context nqic)
     if (_nqic_meta_new(nqic, 32) == false)
         goto clean_me;
 
-    temp_ctxt->metas[midx]->type = NQIM_META_NONE; //image data meta
+    temp_ctxt->metas[midx]->type = NQIM_META_END; //image data meta
 
     ret = true;
 

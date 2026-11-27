@@ -22,7 +22,7 @@ static int nqi_int4bits(int d)
 {
     unsigned u = log2(d);
     int s = nqi_bucket(u);
-    return (s < 15 ? 4 : (s == 15 ? 5 : 6)) + s + 1 + 1;
+    return (s<8?(1+8):(1+(s < 15 ? 4 : (s == 15 ? 5 : 6)) + s + 1 + 1));
 }
 typedef struct
 {

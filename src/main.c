@@ -2,8 +2,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
+#include <time.h>
 #include "nqi_common.h"
 #include "nqic.h"
+#include "nqid.h"
 #include "spng/spng.h"
 
 unsigned char* image_data = NULL;
@@ -48,6 +50,7 @@ cleanup:
 int main(int argc, char* argv[])
 {
     nqic_context nqic = NULL;
+    nqid_context nqid = NULL;
     char* image_file = NULL;
     char* output_file = NULL;
     int w = 0, h = 0;
@@ -71,39 +74,43 @@ int main(int argc, char* argv[])
 
     image_file = argv[2];
     output_file = argv[3];
-    
-    // read image data
-    {
-        FILE* input = fopen(image_file, "rb");
-        if (!input) {
-            fprintf(stderr, "Failed to open input file: %s\n", image_file);
-            return 1;
-        }
-        fseek(input, 0, SEEK_END);
-        image_size = ftell(input);
-        fseek(input, 0, SEEK_SET);
-        image_data = malloc(image_size);
-        if (!image_data) {
-            fprintf(stderr, "Failed to allocate memory for image data\n");
-            fclose(input);
-            return 1;
-        }
-        fread(image_data, 1, image_size, input);
-        fclose(input);
-    }
-
-    // parse
-    {
-        //Currently, only PNG is supported
-        if (image_size < 8 || memcmp(image_data, "\x89PNG\r\n\x1a\n", 8)){
-            fprintf(stderr, "Unsupported image format\n");
-            free(image_data);
-            return 1;
-        }
-        decode_png(image_data, image_size, (void**)&image_decoded, &image_decoded_size, &w, &h);
-    }
 
     if (is_encode) {
+        // read image data
+        {
+            FILE* input = fopen(image_file, "rb");
+            if (!input) {
+                fprintf(stderr, "Failed to open input file: %s\n", image_file);
+                return 1;
+            }
+            fseek(input, 0, SEEK_END);
+            image_size = ftell(input);
+            fseek(input, 0, SEEK_SET);
+            image_data = malloc(image_size);
+            if (!image_data) {
+                fprintf(stderr, "Failed to allocate memory for image data\n");
+                fclose(input);
+                return 1;
+            }
+            fread(image_data, 1, image_size, input);
+            fclose(input);
+        }
+
+        // parse
+        {
+            //Currently, only PNG is supported
+            clock_t begin;
+            clock_t end;
+            if (image_size < 8 || memcmp(image_data, "\x89PNG\r\n\x1a\n", 8)) {
+                fprintf(stderr, "Unsupported image format\n");
+                free(image_data);
+                return 1;
+            }
+            begin = clock();
+            decode_png(image_data, image_size, (void**)&image_decoded, &image_decoded_size, &w, &h);
+            end = clock();
+            printf("png took %f\n", (double)(end - begin) / CLOCKS_PER_SEC);
+        }
         unsigned char* output_data = NULL;
         size_t output_size = 0;
         nqic_init(&nqic);
@@ -117,15 +124,34 @@ int main(int argc, char* argv[])
             fprintf(stderr, "Failed to open output file: %s\n", output_file);
             free(image_data);
             free(image_decoded);
-            free(output_data);
             return 1;
         }
         fwrite(output_data, 1, output_size, output);
         fclose(output);
-        free(output_data);
+        nqic_free(&nqic);
     } else {
-        printf("Decompression is not implemented yet.\n");
-        return 1;
+        // read image data
+        {
+            FILE* input = fopen(image_file, "rb");
+            if (!input) {
+                fprintf(stderr, "Failed to open input file: %s\n", image_file);
+                return 1;
+            }
+            fseek(input, 0, SEEK_END);
+            image_size = ftell(input);
+            fseek(input, 0, SEEK_SET);
+            image_data = malloc(image_size);
+            if (!image_data) {
+                fprintf(stderr, "Failed to allocate memory for image data\n");
+                fclose(input);
+                return 1;
+            }
+            fread(image_data, 1, image_size, input);
+            fclose(input);
+        }
+        nqid_init(&nqid);
+        nqid_load_image(nqid, image_data, image_size);
+        nqid_decode(nqid);
     }
     return 0;
 }

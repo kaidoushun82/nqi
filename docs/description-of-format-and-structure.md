@@ -25,18 +25,18 @@ In its' basic form, there are two meta chunks: a whole image information meta an
 | Item                 | Type              | Description                       |
 | -------------------- | ----------------- | --------------------------------- |
 | Total frames         | 2-bytes u8/u16 le | Only useful for NQIA files, the parser checks if it is strictly 1 for NQII files |
-| Total width          | Variable bytes le | Full width of image, stored in VLQ form, preceded by a sign bit |
-| Total height         | Variable bytes le | Full height of image, stored in VLQ form, preceded by a sign bit |
+| Total width          | Variable bytes le | Full width of image, stored in VLQ form |
+| Total height         | Variable bytes le | Full height of image, stored in VLQ form |
 
 ### IDM (Image Data Meta)
 
 | Item                 | Type              | Description                       |
 | -------------------- | ----------------- | --------------------------------- |
 | Index                | 2-bytes u8/u16 le | Only useful for NQIA files, only one image data meta exists in NQII files |
-| Image width          | Variable bytes le | Full width of image, stored in VLQ form, preceded by a sign bit |
-| Image height         | Variable bytes le | Full height of image, stored in VLQ form, preceded by a sign bit |
-| X Offset             | Variable bytes le | X Offset of frame since last frame offset (differential), stored in VLQ form, preceded by a sign bit |
-| Y Offset             | Variable bytes le | Y Offset of frame since last frame offset (differential), stored in VLQ form, preceded by a sign bit |
+| Image width          | Variable bytes le | Full width of image, stored in VLQ form |
+| Image height         | Variable bytes le | Full height of image, stored in VLQ form |
+| X Offset             | Variable bytes le | X Offset of frame since last frame offset (differential), stored in VLQ form |
+| Y Offset             | Variable bytes le | Y Offset of frame since last frame offset (differential), stored in VLQ form |
 | Attributes           | 2-bytes u8/u16 le | See attributes sub-section |
 | Image data           | Variable bytes    | Compressed data, with 4-byte u8/u32 le size preceding it |
 

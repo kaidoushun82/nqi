@@ -4,10 +4,11 @@
 // ======================== METADATA ==========================
 
 typedef enum {
-    NQIM_META_NONE = 0,
+    NQIM_META_INVALID = 0,
     NQIM_META_WHOLE_IMAGE = 1,
     NQIM_META_IMAGE_DATA = 2,
     //... rest to follow soon
+    NQIM_META_END = 0xff,
 } nqim_meta_type;
 
 typedef struct {
