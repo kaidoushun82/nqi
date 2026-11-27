@@ -92,6 +92,7 @@ typedef struct
     //Header
     unsigned short v_maj;
     unsigned short v_min;
+    bool is_animated;
 
     //WIM
     unsigned short frames;
@@ -128,7 +129,7 @@ typedef struct
     }
 
 
-#define READ_VLQ(val, ctxt)     \
+#define READ_VLQ16(val, ctxt, ret)     \
     {   \
         unsigned char bs = 0;   \
         unsigned char t = 0;    \
@@ -136,6 +137,24 @@ typedef struct
         do  \
         {   \
             t = ctxt->src[ctxt->curr_offs]; \
+            if ((val | ((t&0x7f) << bs)) > 0xffff) return (ret); \
+            val |= (t&0x7f) << bs;    \
+            ctxt->curr_offs++;  \
+            if (t<=0x7f)   break;  \
+            bs+= 7; \
+        }   \
+        while (true); \
+    }
+
+#define READ_VLQ32(val, ctxt, ret)     \
+    {   \
+        unsigned char bs = 0;   \
+        unsigned char t = 0;    \
+        val = 0;    \
+        do  \
+        {   \
+            t = ctxt->src[ctxt->curr_offs]; \
+            if ((val | ((t&0x7f) << bs)) > 0xffffffff) return (ret); \
             val |= (t&0x7f) << bs;    \
             ctxt->curr_offs++;  \
             if (t<=0x7f)   break;  \
@@ -195,11 +214,11 @@ NQI_INLINE uint32_t br_get(nqi_br* b, uint32_t k)
     if (b->n == 0)
     {
         memcpy(&b->acc, b->p, 4);
-        b->p+=4;
+        b->p += 4;
         BSWAP1(b->acc);
-        v = (b->acc >> (32-k));
-        b->acc <<= k;
         b->n = 32-k;
+        v = (b->acc >> b->n);
+        b->acc <<= k;
     }
     else if (b->n < k)
     {
@@ -208,9 +227,9 @@ NQI_INLINE uint32_t br_get(nqi_br* b, uint32_t k)
         memcpy(&b->acc, b->p, 4);
         b->p+=4;
         BSWAP1(b->acc);
-        v |= b->acc >> (32 - f);
-        b->acc <<= f;
         b->n = 32 - f;
+        v |= (b->acc >> b->n);
+        b->acc <<= f;
     }
     else
     {
@@ -461,7 +480,11 @@ bool nqid_load_image(nqid_context nqid, const unsigned char* data, size_t size)
         return false;
     }
 
-    if (!(data[3] == 'A' || data[3] == 'M'))
+    if (data[3] == 'A')
+    {
+        temp_ctxt->is_animated = true;
+    }
+    else if (data[3] != 'M')
     {
         return false;
     }
@@ -480,7 +503,7 @@ bool nqid_load_image(nqid_context nqid, const unsigned char* data, size_t size)
         return false; //not valid
     }
 
-    READ_VLQ(tsize, temp_ctxt);
+    READ_VLQ32(tsize, temp_ctxt, false);
     if (tsize < 4)
     {
         temp_ctxt->src = NULL;
@@ -490,8 +513,8 @@ bool nqid_load_image(nqid_context nqid, const unsigned char* data, size_t size)
     }
 
     READ_UINT16(temp_ctxt->frames, temp_ctxt);
-    READ_VLQ(temp_ctxt->width, temp_ctxt);
-    READ_VLQ(temp_ctxt->height, temp_ctxt);
+    READ_VLQ16(temp_ctxt->width, temp_ctxt, false);
+    READ_VLQ16(temp_ctxt->height, temp_ctxt, false);
 
     //tag is 4-byte align
 
@@ -559,7 +582,7 @@ bool nqid_decode(nqid_context nqid)
         return false; //not valid
     }
 
-    READ_VLQ(tsize, temp_ctxt);
+    READ_VLQ32(tsize, temp_ctxt, false);
     if (tsize < 16)
     {
         return false; //not valid
@@ -567,10 +590,10 @@ bool nqid_decode(nqid_context nqid)
 
     temp_ctxt->curr_offs += 2; //skip idx for now...
 
-    READ_VLQ(w, temp_ctxt);
-    READ_VLQ(h, temp_ctxt);
-    READ_VLQ(x, temp_ctxt);
-    READ_VLQ(y, temp_ctxt);
+    READ_VLQ16(w, temp_ctxt, false);
+    READ_VLQ16(h, temp_ctxt, false);
+    READ_VLQ16(x, temp_ctxt, false);
+    READ_VLQ16(y, temp_ctxt, false);
 
 
     temp_ctxt->curr_offs += 2; //skip atts for now, none at the moment until noted...
