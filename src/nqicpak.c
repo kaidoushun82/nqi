@@ -311,7 +311,7 @@ void _nqicpak_pack_block_4x4_rleoff(nqicpak_block* block, unsigned char* cmd, un
         run = _nqicpak_find_rle_4x4(block, curr_pel); TOK('R', run, 0);
         _nqicpak_pack_integ(cmd, cmd_size, run);
         {
-            int curr_off = nqi_pel_find(ph, pel, base, *pel_size, &block->pels[curr_pel]);
+            int curr_off = nqi_pel_find(ph, pel, base, *pel_size, (const unsigned char*)&block->pels[curr_pel]);
             int diff = ((*pel_size) - curr_off) / 3;
             int diff2 = diff - *curr_diff;
             bool valid_to_exist_in_prev = false;
@@ -385,7 +385,7 @@ void _nqicpak_pack_block_4x4_prevdiff_rleoff(nqicpak_block* block, nqicpak_block
                 }
                 if (write_pel == true)
                 {
-                    int curr_off = nqi_pel_find(ph, pel, base, *pel_size, &block->pels[curr_pel]);
+                    int curr_off = nqi_pel_find(ph, pel, base, *pel_size, (const unsigned char*)&block->pels[curr_pel]);
                     int diff = ((*pel_size) - curr_off) / 3;
                     int diff2 = diff - *curr_diff;
                     bool valid_to_exist_in_prev = false;
